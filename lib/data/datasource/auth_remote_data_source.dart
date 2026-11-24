@@ -10,20 +10,24 @@ abstract class AuthRemoteDataSource {
   Stream<UserModel?> get authStateChanges;
   UserModel? get currentUser;
   Future<UserModel> signInWithEmailPassword(String email, String password);
-  Future<UserModel> registerWithEmailPassword(String email, String password, String displayName);
+  Future<UserModel> registerWithEmailPassword(
+    String email,
+    String password,
+    String displayName,
+  );
   Future<UserModel> signInAnonymously();
   Future<void> signOut();
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
-  final StreamController<UserModel?> _authController = StreamController<UserModel?>.broadcast();
+  final StreamController<UserModel?> _authController =
+      StreamController<UserModel?>.broadcast();
   UserModel? _currentUser;
   bool _isFirebaseAvailable = false;
+  StreamSubscription<fb.User?>? _fbAuthSub;
 
-  static const String _prefKeyUid = 'auth_session_uid';
   static const String _prefKeyEmail = 'auth_session_email';
   static const String _prefKeyName = 'auth_session_name';
-  static const String _prefKeyIsAnon = 'auth_session_is_anon';
 
   AuthRemoteDataSourceImpl() {
     _init();
@@ -38,6 +42,32 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       if (Firebase.apps.isNotEmpty) {
         _isFirebaseAvailable = true;
+
+        // Listen to Firebase Authentication state changes
+        _fbAuthSub = fb.FirebaseAuth.instance.authStateChanges().listen((
+          fbUser,
+        ) {
+          if (fbUser != null) {
+            final user = UserModel(
+              email: fbUser.email ?? '',
+              name:
+                  fbUser.displayName ??
+                  (fbUser.email?.split('@').first ?? 'Trader'),
+            );
+            _currentUser = user;
+            _persistSession(user);
+            _authController.add(user);
+          } else {
+            if (_currentUser != null &&
+                _currentUser!.email == 'guest@crypto.app') {
+              // keep guest session
+            } else {
+              _currentUser = null;
+              _clearPersistedSession();
+              _authController.add(null);
+            }
+          }
+        });
       }
     } catch (e) {
       _isFirebaseAvailable = false;
@@ -48,17 +78,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> _loadSavedSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final uid = prefs.getString(_prefKeyUid);
       final email = prefs.getString(_prefKeyEmail);
       final name = prefs.getString(_prefKeyName);
-      final isAnon = prefs.getBool(_prefKeyIsAnon) ?? false;
 
-      if (uid != null && email != null) {
+      if (email != null) {
         _currentUser = UserModel(
-          uid: uid,
           email: email,
-          displayName: name ?? email.split('@').first,
-          isAnonymous: isAnon,
+          name: name ?? email.split('@').first,
         );
         _authController.add(_currentUser);
       }
@@ -70,10 +96,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> _persistSession(UserModel user) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_prefKeyUid, user.uid);
       await prefs.setString(_prefKeyEmail, user.email);
-      await prefs.setString(_prefKeyName, user.displayName);
-      await prefs.setBool(_prefKeyIsAnon, user.isAnonymous);
+      await prefs.setString(_prefKeyName, user.name);
     } catch (e) {
       debugPrint('Error persisting session: $e');
     }
@@ -82,10 +106,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> _clearPersistedSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_prefKeyUid);
       await prefs.remove(_prefKeyEmail);
       await prefs.remove(_prefKeyName);
-      await prefs.remove(_prefKeyIsAnon);
     } catch (e) {
       debugPrint('Error clearing session: $e');
     }
@@ -98,80 +120,113 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   UserModel? get currentUser => _currentUser;
 
   @override
-  Future<UserModel> signInWithEmailPassword(String email, String password) async {
-    final cleanEmail = email.trim().toLowerCase();
+  Future<UserModel> signInWithEmailPassword(
+    String email,
+    String password,
+  ) async {
+    final cleanEmail = email.trim();
     final cleanPassword = password.trim();
 
     if (_isFirebaseAvailable) {
       try {
-        final usersCollection = FirebaseFirestore.instance.collection('users');
+        // 1. Sign in with Firebase Authentication
+        final cred = await fb.FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: cleanEmail,
+          password: cleanPassword,
+        );
 
-        // Query Firestore users collection for matching email
-        var querySnapshot = await usersCollection.where('email', isEqualTo: cleanEmail).get();
+        String name = cred.user?.displayName ?? cleanEmail.split('@').first;
 
-        // Fallback for case-sensitive match if needed
-        if (querySnapshot.docs.isEmpty) {
-          querySnapshot = await usersCollection.where('email', isEqualTo: email.trim()).get();
+        // 2. Sync / fetch user profile from Firestore 'users' collection
+        try {
+          final uid = cred.user?.uid ?? '';
+          if (uid.isNotEmpty) {
+            final userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .get();
+            if (userDoc.exists) {
+              name = userDoc.data()?['name']?.toString() ?? name;
+            } else {
+              // Ensure doc exists in Firestore as well
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .set({
+                    'name': name,
+                    'email': cleanEmail.toLowerCase(),
+                    'password': cleanPassword,
+                    'uid': uid,
+                  }, SetOptions(merge: true));
+            }
+          }
+        } catch (dbErr) {
+          debugPrint('Firestore fetch notice: $dbErr');
         }
 
-        if (querySnapshot.docs.isNotEmpty) {
-          final doc = querySnapshot.docs.first;
-          final data = doc.data();
-          final storedPassword = data['password']?.toString() ?? '';
+        final user = UserModel(
+          email: cleanEmail,
+          name: name,
+          password: cleanPassword,
+        );
 
-          if (storedPassword != cleanPassword) {
-            throw Exception('Incorrect password. Please verify your credentials.');
+        _currentUser = user;
+        await _persistSession(user);
+        _authController.add(user);
+        return user;
+      } on fb.FirebaseAuthException catch (e) {
+        // Fallback: Check if user exists in Firestore 'users' collection
+        try {
+          final querySnap = await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: cleanEmail.toLowerCase())
+              .get();
+          if (querySnap.docs.isNotEmpty) {
+            final data = querySnap.docs.first.data();
+            final storedPass = data['password']?.toString() ?? '';
+            if (storedPass == cleanPassword) {
+              final user = UserModel(
+                email: cleanEmail,
+                name: data['name']?.toString() ?? cleanEmail.split('@').first,
+                password: cleanPassword,
+              );
+              _currentUser = user;
+              await _persistSession(user);
+              _authController.add(user);
+              return user;
+            } else {
+              throw Exception(
+                'Incorrect password. Please verify your credentials.',
+              );
+            }
           }
+        } catch (dbErr) {
+          if (dbErr is Exception &&
+              dbErr.toString().contains('Incorrect password')) {
+            rethrow;
+          }
+        }
 
-          final name = data['name']?.toString() ?? email.split('@').first;
-          final user = UserModel(
-            uid: doc.id,
-            email: data['email']?.toString() ?? cleanEmail,
-            displayName: name,
-            isAnonymous: false,
+        if (e.code == 'operation-not-allowed') {
+          throw Exception(
+            'Firebase Authentication is not enabled for Email/Password.\n'
+            'In Firebase Console: Authentication > Sign-in method tab > Enable "Email/Password" and click Save.',
           );
-
-          // Attempt FirebaseAuth sign-in in sync if available
-          try {
-            await fb.FirebaseAuth.instance.signInWithEmailAndPassword(
-              email: cleanEmail,
-              password: cleanPassword,
-            );
-          } catch (_) {}
-
-          _currentUser = user;
-          await _persistSession(user);
-          _authController.add(user);
-          return user;
+        } else if (e.code == 'user-not-found') {
+          throw Exception(
+            'No user found with email "$email". Please register first.',
+          );
+        } else if (e.code == 'wrong-password' ||
+            e.code == 'invalid-credential') {
+          throw Exception(
+            'Incorrect password. Please verify your credentials.',
+          );
+        } else if (e.code == 'user-disabled') {
+          throw Exception('This account has been disabled.');
+        } else if (e.code == 'invalid-email') {
+          throw Exception('Invalid email address format.');
         } else {
-          // Check if user exists in FirebaseAuth
-          try {
-            final cred = await fb.FirebaseAuth.instance.signInWithEmailAndPassword(
-              email: cleanEmail,
-              password: cleanPassword,
-            );
-            final fbUser = cred.user!;
-            final user = UserModel(
-              uid: fbUser.uid,
-              email: fbUser.email ?? cleanEmail,
-              displayName: fbUser.displayName ?? cleanEmail.split('@').first,
-              isAnonymous: false,
-            );
-
-            // Sync into Firestore 'users' collection with the expected structure
-            await usersCollection.doc(user.uid).set({
-              'email': cleanEmail,
-              'name': user.displayName,
-              'password': cleanPassword,
-            }, SetOptions(merge: true));
-
-            _currentUser = user;
-            await _persistSession(user);
-            _authController.add(user);
-            return user;
-          } catch (authError) {
-            throw Exception('No user found with email "$email". Please register first.');
-          }
+          throw Exception(e.message ?? 'Login error (${e.code})');
         }
       } catch (e) {
         if (e is Exception) rethrow;
@@ -179,13 +234,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     }
 
-    // Resilient simulated fallback if Firebase is offline
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Fallback mode if offline
+    await Future.delayed(const Duration(milliseconds: 300));
     final fallbackUser = UserModel(
-      uid: 'user_${DateTime.now().millisecondsSinceEpoch}',
+      password: cleanPassword,
       email: cleanEmail,
-      displayName: cleanEmail.split('@').first,
-      isAnonymous: false,
+      name: cleanEmail.split('@').first,
     );
     _currentUser = fallbackUser;
     await _persistSession(fallbackUser);
@@ -199,61 +253,109 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String password,
     String displayName,
   ) async {
-    final cleanEmail = email.trim().toLowerCase();
+    final cleanEmail = email.trim();
     final cleanPassword = password.trim();
-    final cleanName = displayName.trim().isNotEmpty ? displayName.trim() : cleanEmail.split('@').first;
+    final cleanName = displayName.trim().isNotEmpty
+        ? displayName.trim()
+        : cleanEmail.split('@').first;
 
     if (_isFirebaseAvailable) {
       try {
-        final usersCollection = FirebaseFirestore.instance.collection('users');
+        // 1. Create user in Firebase Authentication
+        final cred = await fb.FirebaseAuth.instance
+            .createUserWithEmailAndPassword(
+              email: cleanEmail,
+              password: cleanPassword,
+            );
 
-        // Check if user with this email already exists in Firestore
-        final existing = await usersCollection.where('email', isEqualTo: cleanEmail).get();
-        if (existing.docs.isNotEmpty) {
-          throw Exception('An account with email "$email" already exists. Please sign in instead.');
-        }
+        await cred.user?.updateDisplayName(cleanName);
+        final uid = cred.user?.uid ?? '';
 
-        String userId = '';
-        // Try creating with FirebaseAuth as well
-        try {
-          final cred = await fb.FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: cleanEmail,
-            password: cleanPassword,
-          );
-          await cred.user?.updateDisplayName(cleanName);
-          userId = cred.user?.uid ?? '';
-        } catch (authErr) {
-          debugPrint('FirebaseAuth registration info: $authErr');
-        }
-
-        // Write directly to Firestore 'users' collection with exact structure:
-        // email: ""
+        // 2. Also save to Firestore 'users' collection with your exact schema:
         // name: ""
+        // email: ""
         // password: ""
-        final userDocData = {
-          'email': cleanEmail,
-          'name': cleanName,
-          'password': cleanPassword,
-        };
+        try {
+          final usersCollection = FirebaseFirestore.instance.collection(
+            'users',
+          );
+          final userDocData = {
+            'name': cleanName,
+            'email': cleanEmail.toLowerCase(),
+            'password': cleanPassword,
+            if (uid.isNotEmpty) 'uid': uid,
+          };
 
-        if (userId.isNotEmpty) {
-          await usersCollection.doc(userId).set(userDocData);
-        } else {
-          final newDoc = await usersCollection.add(userDocData);
-          userId = newDoc.id;
+          if (uid.isNotEmpty) {
+            await usersCollection
+                .doc(uid)
+                .set(userDocData, SetOptions(merge: true));
+          } else {
+            await usersCollection.add(userDocData);
+          }
+        } catch (dbErr) {
+          debugPrint('Firestore save notice: $dbErr');
         }
 
         final user = UserModel(
-          uid: userId,
+          password: cleanPassword,
           email: cleanEmail,
-          displayName: cleanName,
-          isAnonymous: false,
+          name: cleanName,
         );
 
         _currentUser = user;
         await _persistSession(user);
         _authController.add(user);
         return user;
+      } on fb.FirebaseAuthException catch (e) {
+        // Fallback: Check if user exists in Firestore 'users' collection
+        try {
+          final querySnap = await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: cleanEmail.toLowerCase())
+              .get();
+          if (querySnap.docs.isNotEmpty) {
+            final data = querySnap.docs.first.data();
+            final storedPass = data['password']?.toString() ?? '';
+            if (storedPass == cleanPassword) {
+              final user = UserModel(
+                email: cleanEmail,
+                name: data['name']?.toString() ?? cleanEmail.split('@').first,
+                password: cleanPassword,
+              );
+              _currentUser = user;
+              await _persistSession(user);
+              _authController.add(user);
+              return user;
+            } else {
+              throw Exception(
+                'Incorrect password. Please verify your credentials.',
+              );
+            }
+          }
+        } catch (dbErr) {
+          if (dbErr is Exception &&
+              dbErr.toString().contains('Incorrect password')) {
+            rethrow;
+          }
+        }
+
+        if (e.code == 'operation-not-allowed') {
+          throw Exception(
+            'Firebase Authentication is not enabled for Email/Password.\n'
+            'In Firebase Console: Authentication > Sign-in method tab > Enable "Email/Password" and click Save.',
+          );
+        } else if (e.code == 'email-already-in-use') {
+          throw Exception(
+            'An account with email "$email" already exists. Please sign in instead.',
+          );
+        } else if (e.code == 'weak-password') {
+          throw Exception('Password must be at least 6 characters.');
+        } else if (e.code == 'invalid-email') {
+          throw Exception('The email address is invalid.');
+        } else {
+          throw Exception(e.message ?? 'Registration error (${e.code})');
+        }
       } catch (e) {
         if (e is Exception) rethrow;
         throw Exception(e.toString());
@@ -261,12 +363,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
 
     // Fallback mode if offline
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 300));
     final fallbackUser = UserModel(
-      uid: 'user_${DateTime.now().millisecondsSinceEpoch}',
+      password: cleanPassword,
       email: cleanEmail,
-      displayName: cleanName,
-      isAnonymous: false,
+      name: cleanName,
     );
     _currentUser = fallbackUser;
     await _persistSession(fallbackUser);
@@ -279,28 +380,25 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     if (_isFirebaseAvailable) {
       try {
         final cred = await fb.FirebaseAuth.instance.signInAnonymously();
-        final fbUser = cred.user!;
         final user = UserModel(
-          uid: fbUser.uid,
-          email: 'guest_${fbUser.uid.substring(0, 5)}@crypto.app',
-          displayName: 'Guest Trader',
-          isAnonymous: true,
+          email: 'guest_${cred.user?.uid.substring(0, 5) ?? "0"}@crypto.app',
+          password: 'guest',
+          name: 'Guest Trader',
         );
         _currentUser = user;
         await _persistSession(user);
         _authController.add(user);
         return user;
       } catch (e) {
-        debugPrint('Firebase anon sign in error: $e');
+        debugPrint('Firebase anon sign-in notice: $e');
       }
     }
 
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 200));
     final user = UserModel(
-      uid: 'guest_${DateTime.now().millisecondsSinceEpoch}',
       email: 'guest@crypto.app',
-      displayName: 'Guest Trader',
-      isAnonymous: true,
+      password: 'guest',
+      name: 'Guest Trader',
     );
     _currentUser = user;
     await _persistSession(user);
@@ -318,5 +416,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     await _clearPersistedSession();
     _currentUser = null;
     _authController.add(null);
+  }
+
+  void dispose() {
+    _fbAuthSub?.cancel();
+    _authController.close();
   }
 }

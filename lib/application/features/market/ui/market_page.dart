@@ -69,8 +69,8 @@ class _MarketPageState extends State<MarketPage> {
                     radius: 14,
                     backgroundColor: AppTheme.primaryAccent,
                     child: Text(
-                      state.user.displayName.isNotEmpty
-                          ? state.user.displayName[0].toUpperCase()
+                      state.user.name.isNotEmpty
+                          ? state.user.name[0].toUpperCase()
                           : 'User',
                       style: const TextStyle(
                         fontSize: 12,

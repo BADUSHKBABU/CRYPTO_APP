@@ -5,13 +5,13 @@ import '../../../../domain/entities/chart_point_entity.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
 
-class InteractivePriceChart extends StatefulWidget {
+class PriceChart extends StatefulWidget {
   final List<ChartPointEntity> chartPoints;
   final int selectedDays;
   final Function(int days) onTimeframeChanged;
   final bool isLoading;
 
-  const InteractivePriceChart({
+  const PriceChart({
     super.key,
     required this.chartPoints,
     required this.selectedDays,
@@ -20,10 +20,10 @@ class InteractivePriceChart extends StatefulWidget {
   });
 
   @override
-  State<InteractivePriceChart> createState() => _InteractivePriceChartState();
+  State<PriceChart> createState() => _PriceChartState();
 }
 
-class _InteractivePriceChartState extends State<InteractivePriceChart> {
+class _PriceChartState extends State<PriceChart> {
   ChartPointEntity? _touchedPoint;
 
   @override
@@ -32,7 +32,10 @@ class _InteractivePriceChartState extends State<InteractivePriceChart> {
       return Container(
         height: 240,
         alignment: Alignment.center,
-        child: const Text('No chart data available', style: TextStyle(color: AppTheme.textMuted)),
+        child: const Text(
+          'No chart data available',
+          style: TextStyle(color: AppTheme.textMuted),
+        ),
       );
     }
 
@@ -42,8 +45,12 @@ class _InteractivePriceChartState extends State<InteractivePriceChart> {
     final chartColor = isGaining ? AppTheme.gainGreen : AppTheme.lossRed;
 
     // Calculate min and max for bounds
-    double minPrice = widget.chartPoints.map((e) => e.price).reduce((a, b) => a < b ? a : b);
-    double maxPrice = widget.chartPoints.map((e) => e.price).reduce((a, b) => a > b ? a : b);
+    double minPrice = widget.chartPoints
+        .map((e) => e.price)
+        .reduce((a, b) => a < b ? a : b);
+    double maxPrice = widget.chartPoints
+        .map((e) => e.price)
+        .reduce((a, b) => a > b ? a : b);
     if (minPrice == maxPrice) {
       minPrice *= 0.95;
       maxPrice *= 1.05;
@@ -78,7 +85,10 @@ class _InteractivePriceChartState extends State<InteractivePriceChart> {
                 children: [
                   Text(
                     _touchedPoint != null ? 'Price at Point' : 'Current Rate',
-                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    style: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -94,7 +104,10 @@ class _InteractivePriceChartState extends State<InteractivePriceChart> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text('Date / Time', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                  const Text(
+                    'Date / Time',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     DateFormat('MMM d, HH:mm').format(activePoint.timestamp),
@@ -116,7 +129,10 @@ class _InteractivePriceChartState extends State<InteractivePriceChart> {
           height: 220,
           child: widget.isLoading
               ? const Center(
-                  child: CircularProgressIndicator(color: AppTheme.primaryAccent, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: AppTheme.primaryAccent,
+                    strokeWidth: 2,
+                  ),
                 )
               : LineChart(
                   LineChartData(
@@ -135,10 +151,18 @@ class _InteractivePriceChartState extends State<InteractivePriceChart> {
                       ),
                     ),
                     titlesData: const FlTitlesData(
-                      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      topTitles: AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                     ),
                     borderData: FlBorderData(show: false),
                     lineTouchData: LineTouchData(
@@ -158,20 +182,24 @@ class _InteractivePriceChartState extends State<InteractivePriceChart> {
                           }).toList();
                         },
                       ),
-                      touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
-                        if (response?.lineBarSpots != null && response!.lineBarSpots!.isNotEmpty) {
-                          final index = response.lineBarSpots!.first.spotIndex;
-                          if (index < widget.chartPoints.length) {
-                            setState(() {
-                              _touchedPoint = widget.chartPoints[index];
-                            });
-                          }
-                        } else if (event is FlPanEndEvent || event is FlTapUpEvent) {
-                          setState(() {
-                            _touchedPoint = null;
-                          });
-                        }
-                      },
+                      touchCallback:
+                          (FlTouchEvent event, LineTouchResponse? response) {
+                            if (response?.lineBarSpots != null &&
+                                response!.lineBarSpots!.isNotEmpty) {
+                              final index =
+                                  response.lineBarSpots!.first.spotIndex;
+                              if (index < widget.chartPoints.length) {
+                                setState(() {
+                                  _touchedPoint = widget.chartPoints[index];
+                                });
+                              }
+                            } else if (event is FlPanEndEvent ||
+                                event is FlTapUpEvent) {
+                              setState(() {
+                                _touchedPoint = null;
+                              });
+                            }
+                          },
                     ),
                     lineBarsData: [
                       LineChartBarData(

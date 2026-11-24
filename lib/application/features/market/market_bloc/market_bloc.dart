@@ -68,6 +68,8 @@ class MarketBloc extends Bloc<MarketEvent, MarketState> {
     }
   }
 
+
+
   void _onSearchQueryChanged(
     SearchQueryChangedEvent event,
     Emitter<MarketState> emit,

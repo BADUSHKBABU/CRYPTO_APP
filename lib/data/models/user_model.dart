@@ -2,41 +2,41 @@ import '../../domain/entities/user_entity.dart';
 
 class UserModel extends UserEntity {
   const UserModel({
-    required super.uid,
+    // required super.uid,
     required super.email,
-    required super.displayName,
-    super.photoUrl,
-    super.isAnonymous,
+    required super.name,
+    super.password,
+    // super.isAnonymous,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      uid: json['uid'] ?? '',
+      // uid: json['uid'] ?? '',
       email: json['email'] ?? '',
-      displayName: json['displayName'] ?? json['name'] ?? '',
-      photoUrl: json['photoUrl'],
-      isAnonymous: json['isAnonymous'] ?? false,
+      name: json['name'] ?? json['name'] ?? '',
+      password: json['password'],
+      // isAnonymous: json['isAnonymous'] ?? false,
     );
   }
 
   factory UserModel.fromFirestore(Map<String, dynamic> data, String id) {
     return UserModel(
-      uid: id,
+      // uid: id,
       email: data['email']?.toString() ?? '',
-      displayName: data['name']?.toString() ?? data['displayName']?.toString() ?? '',
-      photoUrl: data['photoUrl']?.toString(),
-      isAnonymous: data['isAnonymous'] == true,
+      name: data['name']?.toString() ?? data['name']?.toString() ?? '',
+      password: data['password']?.toString(),
+      // isAnonymous: data['isAnonymous'] == true,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'uid': uid,
+      // 'uid': uid,
       'email': email,
-      'name': displayName,
-      'displayName': displayName,
-      'photoUrl': photoUrl,
-      'isAnonymous': isAnonymous,
+      'name': name,
+      // 'displayName': displayName,
+      'password': password,
+      // 'isAnonymous': isAnonymous,
     };
   }
 }

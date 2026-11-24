@@ -53,22 +53,25 @@ class CoinDetailsPage extends StatelessWidget {
                 initialCoin.image,
                 width: 28,
                 height: 28,
-                errorBuilder: (_, __, ___) => const Icon(Icons.monetization_on, size: 28, color: AppTheme.primaryAccent),
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.monetization_on,
+                  size: 28,
+                  color: AppTheme.primaryAccent,
+                ),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                initialCoin.name,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(initialCoin.name, overflow: TextOverflow.ellipsis),
             ),
           ],
         ),
         actions: [
           BlocBuilder<WatchlistBloc, WatchlistState>(
             builder: (context, state) {
-              final isWatched = state is WatchlistLoadedState && state.isWatched(initialCoin.id);
+              final isWatched =
+                  state is WatchlistLoadedState &&
+                  state.isWatched(initialCoin.id);
               return IconButton(
                 icon: Icon(
                   isWatched ? Icons.star_rounded : Icons.star_outline_rounded,
@@ -76,7 +79,9 @@ class CoinDetailsPage extends StatelessWidget {
                   size: 26,
                 ),
                 onPressed: () {
-                  context.read<WatchlistBloc>().add(ToggleWatchlistCoinEvent(initialCoin.id));
+                  context.read<WatchlistBloc>().add(
+                    ToggleWatchlistCoinEvent(initialCoin.id),
+                  );
                 },
               );
             },
@@ -86,12 +91,16 @@ class CoinDetailsPage extends StatelessWidget {
       body: BlocBuilder<DetailsBloc, DetailsState>(
         builder: (context, state) {
           if (state is DetailsLoadingState) {
-            return const AppLoadingWidget(message: 'Loading comprehensive market data...');
+            return const AppLoadingWidget(
+              message: 'Loading comprehensive market data...',
+            );
           } else if (state is DetailsErrorState) {
             return AppErrorWidget(
               message: state.message,
               onRetry: () {
-                context.read<DetailsBloc>().add(FetchCoinDetailsEvent(coinId: initialCoin.id));
+                context.read<DetailsBloc>().add(
+                  FetchCoinDetailsEvent(coinId: initialCoin.id),
+                );
               },
             );
           } else if (state is DetailsLoadedState) {
@@ -122,15 +131,26 @@ class CoinDetailsPage extends StatelessWidget {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              PriceChangeBadge(changePercentage: coin.priceChangePercentage24h),
+                              PriceChangeBadge(
+                                changePercentage: coin.priceChangePercentage24h,
+                              ),
                               const SizedBox(width: 8),
-                              const Text('24h Change', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                              const Text(
+                                '24h Change',
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.surfaceColor,
                           borderRadius: BorderRadius.circular(10),
@@ -150,14 +170,14 @@ class CoinDetailsPage extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Interactive Chart with Timeframes
-                  InteractivePriceChart(
+                  PriceChart(
                     chartPoints: state.chartPoints,
                     selectedDays: state.selectedDays,
                     isLoading: state.isChartLoading,
                     onTimeframeChanged: (days) {
                       context.read<DetailsBloc>().add(
-                            ChangeChartTimeframeEvent(coinId: coin.id, days: days),
-                          );
+                        ChangeChartTimeframeEvent(coinId: coin.id, days: days),
+                      );
                     },
                   ),
                   const SizedBox(height: 28),
@@ -206,4 +226,3 @@ class CoinDetailsPage extends StatelessWidget {
     );
   }
 }
-

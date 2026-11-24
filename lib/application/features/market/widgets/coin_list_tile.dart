@@ -61,7 +61,11 @@ class CoinListTile extends StatelessWidget {
                   width: 36,
                   height: 36,
                   color: AppTheme.cardColor,
-                  child: const Icon(Icons.currency_bitcoin, size: 22, color: AppTheme.primaryAccent),
+                  child: const Icon(
+                    Icons.currency_bitcoin,
+                    size: 22,
+                    color: AppTheme.primaryAccent,
+                  ),
                 ),
               ),
             ),
@@ -85,12 +89,14 @@ class CoinListTile extends StatelessWidget {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      Text(
-                        coin.symbol,
-                        style: const TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                      Expanded(
+                        child: Text(
+                          coin.symbol,
+                          style: const TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -131,16 +137,21 @@ class CoinListTile extends StatelessWidget {
             // Watchlist Star Icon
             BlocBuilder<WatchlistBloc, WatchlistState>(
               builder: (context, state) {
-                final isWatched = state is WatchlistLoadedState && state.isWatched(coin.id);
+                final isWatched =
+                    state is WatchlistLoadedState && state.isWatched(coin.id);
                 return InkWell(
                   borderRadius: BorderRadius.circular(20),
                   onTap: () {
-                    context.read<WatchlistBloc>().add(ToggleWatchlistCoinEvent(coin.id));
+                    context.read<WatchlistBloc>().add(
+                      ToggleWatchlistCoinEvent(coin.id),
+                    );
                   },
                   child: Padding(
                     padding: const EdgeInsets.all(4.0),
                     child: Icon(
-                      isWatched ? Icons.star_rounded : Icons.star_outline_rounded,
+                      isWatched
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
                       color: isWatched ? Colors.amber : AppTheme.textMuted,
                       size: 22,
                     ),
@@ -154,4 +165,3 @@ class CoinListTile extends StatelessWidget {
     );
   }
 }
-

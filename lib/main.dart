@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'application/core/theme/app_theme.dart';
 import 'application/features/auth/auth_bloc/auth_bloc.dart';
 import 'application/features/auth/auth_bloc/auth_event.dart';
+import 'application/features/auth/auth_bloc/auth_state.dart';
+import 'application/features/auth/ui/login_page.dart';
 import 'application/features/market/market_bloc/market_bloc.dart';
 import 'application/features/market/market_bloc/market_event.dart';
 import 'application/features/market/ui/homePage.dart';
@@ -73,10 +75,18 @@ class CryptoPulseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CryptoPulse - Market Research',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const HomePage(),
+      // Show appropriate page based on authentication state
+  home: BlocBuilder<AuthBloc, AuthState>(
+    builder: (context, state) {
+      if (state is AuthAuthenticated) {
+        return const HomePage();
+      } else {
+        return const LoginPage();
+      }
+    },
+  ),
     );
   }
 }

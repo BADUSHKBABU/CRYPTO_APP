@@ -1,16 +1,16 @@
 class UserEntity {
-  final String uid;
+
   final String email;
-  final String displayName;
-  final String? photoUrl;
-  final bool isAnonymous;
+  final String name;
+  final String? password;
+  // final bool isAnonymous;
 
   const UserEntity({
-    required this.uid,
+    // required this.uid,
     required this.email,
-    required this.displayName,
-    this.photoUrl,
-    this.isAnonymous = false,
+    required this.name,
+    this.password,
+    // this.isAnonymous = false,
   });
 }
 

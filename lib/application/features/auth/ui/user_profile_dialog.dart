@@ -27,7 +27,7 @@ class UserProfileDialog extends StatelessWidget {
               radius: 36,
               backgroundColor: AppTheme.primaryAccent.withValues(alpha: 0.2),
               child: Text(
-                user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
+                user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
                 style: const TextStyle(
                   color: AppTheme.primaryAccent,
                   fontSize: 28,
@@ -37,7 +37,7 @@ class UserProfileDialog extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              user.displayName,
+              user.name,
               style: const TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 18,
@@ -56,15 +56,13 @@ class UserProfileDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: user.isAnonymous
-                    ? AppTheme.secondaryAccent.withValues(alpha: 0.15)
-                    : AppTheme.gainGreen.withValues(alpha: 0.15),
+                color: AppTheme.gainGreen.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                user.isAnonymous ? 'Demo Guest Session' : 'Firebase Verified Session',
+                'Firebase Verified Session',
                 style: TextStyle(
-                  color: user.isAnonymous ? AppTheme.secondaryAccent : AppTheme.gainGreen,
+                  color: AppTheme.gainGreen,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
