@@ -78,35 +78,35 @@ class _LoginPageState extends State<LoginPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Crypto Branding Header
-                      Center(
-                        child: Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppTheme.primaryAccent, AppTheme.secondaryAccent],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primaryAccent.withValues(alpha: 0.35),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.candlestick_chart_rounded,
-                            size: 42,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                      // Center(
+                      //   child: Container(
+                      //     width: 72,
+                      //     height: 72,
+                      //     decoration: BoxDecoration(
+                      //       gradient: const LinearGradient(
+                      //         colors: [AppTheme.primaryAccent, AppTheme.secondaryAccent],
+                      //         begin: Alignment.topLeft,
+                      //         end: Alignment.bottomRight,
+                      //       ),
+                      //       borderRadius: BorderRadius.circular(20),
+                      //       boxShadow: [
+                      //         BoxShadow(
+                      //           color: AppTheme.primaryAccent.withValues(alpha: 0.35),
+                      //           blurRadius: 20,
+                      //           offset: const Offset(0, 8),
+                      //         ),
+                      //       ],
+                      //     ),
+                      //     child: const Icon(
+                      //       Icons.candlestick_chart_rounded,
+                      //       size: 42,
+                      //       color: Colors.white,
+                      //     ),
+                      //   ),
+                      // ),
+                      // const SizedBox(height: 24),
                       const Text(
-                        'CryptoPulse',
+                        'Crypto App',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppTheme.textPrimary,
